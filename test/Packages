@@ -1,0 +1,35 @@
+Package: golang-github-burntsushi-toml-dev
+Source: golang-toml
+Version: 0.3.0+git20170626.7.a368813-1
+Installed-Size: 163
+Maintainer: Debian Go Packaging Team <pkg-go-maintainers@lists.alioth.debian.org>
+Architecture: all
+Replaces: golang-toml-dev (<< 0.2.0-2~)
+Provides: golang-toml-dev
+Breaks: golang-toml-dev (<< 0.2.0-2~)
+Description: TOML parser and encoder for Go with reflection
+Homepage: https://github.com/BurntSushi/toml
+Description-md5: ec7d74fc1f64aa88e37fb101e95177e6
+Section: devel
+Priority: optional
+Filename: pool/main/g/golang-toml/golang-github-burntsushi-toml-dev_0.3.0+git20170626.7.a368813-1_all.deb
+Size: 38228
+MD5sum: ffd2dcc845adf1a1cfab867a21f23e4f
+SHA256: f6189fe71f9d724f609f3ff54f4f9f862167fab4b8e8edb89646268d91ab102f
+
+Package: golang-toml-dev
+Source: golang-toml
+Version: 0.3.0+git20170626.7.a368813-1
+Installed-Size: 12
+Maintainer: Debian Go Packaging Team <pkg-go-maintainers@lists.alioth.debian.org>
+Architecture: all
+Depends: golang-github-burntsushi-toml-dev
+Description: Transitional package for golang-github-burntsushi-toml-dev
+Homepage: https://github.com/BurntSushi/toml
+Description-md5: 3ec5df8f5c7714387ccc26dd6541e297
+Section: devel
+Priority: optional
+Filename: pool/main/g/golang-toml/golang-toml-dev_0.3.0+git20170626.7.a368813-1_all.deb
+Size: 4076
+MD5sum: 1321751b649dcdef3744a8aed2539001
+SHA256: b338fc79c358b531c6eef79707a99107179a2ad4aa1e7700a6a9085f1c7d88c1

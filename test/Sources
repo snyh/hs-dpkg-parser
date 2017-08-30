@@ -1,0 +1,113 @@
+Package: golang-toml
+Binary: golang-toml-dev
+Version: 0.1.0+git20160102.23.5c4df71-1
+Maintainer: Debian Go Packaging Team <pkg-go-maintainers@lists.alioth.debian.org>
+Uploaders: Jelmer Vernooij <jelmer@debian.org>, Anthony Fok <foka@debian.org>
+Build-Depends: debhelper (>= 9), dh-golang, golang-go
+Architecture: all
+Standards-Version: 3.9.6
+Format: 3.0 (quilt)
+Files:
+ 72a59662d45ea48e04df622e2ae38fb8 2205 golang-toml_0.1.0+git20160102.23.5c4df71-1.dsc
+ 7743ae7f5be3c86ce5870957d539613c 32936 golang-toml_0.1.0+git20160102.23.5c4df71.orig.tar.xz
+ 170872f63d3664276e357c92923a09d3 3188 golang-toml_0.1.0+git20160102.23.5c4df71-1.debian.tar.xz
+Vcs-Browser: https://anonscm.debian.org/cgit/pkg-go/packages/golang-toml.git
+Vcs-Git: git://anonscm.debian.org/pkg-go/packages/golang-toml.git
+Checksums-Sha256:
+ 9b48bea6546411b6b980fb14ef30eb9eddfbbb16bdca3f5a87d9eab537c57536 2205 golang-toml_0.1.0+git20160102.23.5c4df71-1.dsc
+ f9b00476d59a4d4ca0c65ff0140eb119553f55a0e5ea630390fb5d1f7b489fd9 32936 golang-toml_0.1.0+git20160102.23.5c4df71.orig.tar.xz
+ 428691c775e78bbabe007d39265ea3f9ff336308773468ca622169ba592d886d 3188 golang-toml_0.1.0+git20160102.23.5c4df71-1.debian.tar.xz
+Homepage: https://github.com/BurntSushi/toml
+Go-Import-Path: github.com/BurntSushi/toml
+Package-List: 
+ golang-toml-dev deb devel extra arch=all
+Extra-Source-Only: yes
+Directory: pool/main/g/golang-toml
+Priority: optional
+Section: misc
+
+Package: golang-toml
+Binary: golang-github-burntsushi-toml-dev, golang-toml-dev
+Version: 0.2.0-3
+Maintainer: Debian Go Packaging Team <pkg-go-maintainers@lists.alioth.debian.org>
+Uploaders: Jelmer Vernooij <jelmer@debian.org>, Anthony Fok <foka@debian.org>
+Build-Depends: debhelper (>= 9), dh-golang, golang-any
+Architecture: all
+Standards-Version: 3.9.8
+Format: 3.0 (quilt)
+Files:
+ 1fb7bec2dc12d4253e72ec6e08db0890 2148 golang-toml_0.2.0-3.dsc
+ db9d7bfdedea2c8907d54c2710e78ec8 38304 golang-toml_0.2.0.orig.tar.gz
+ d640b989199b33d3dcdf7563efb43805 3636 golang-toml_0.2.0-3.debian.tar.xz
+Vcs-Browser: https://anonscm.debian.org/cgit/pkg-go/packages/golang-toml.git
+Vcs-Git: https://anonscm.debian.org/git/pkg-go/packages/golang-toml.git
+Checksums-Sha256:
+ 1e3e97e2fdbbe1a9655692d470896917fac271dccef7b91d25312c14458d3c7c 2148 golang-toml_0.2.0-3.dsc
+ 4d496e400019fd050ff569952befb464f03ed586cb475640bdc206fe5c2b75cc 38304 golang-toml_0.2.0.orig.tar.gz
+ 55b34c0e50e0e8bd55e2a437fa40f17a505719927790038c3a9cbaeb242b3a64 3636 golang-toml_0.2.0-3.debian.tar.xz
+Homepage: https://github.com/BurntSushi/toml
+Go-Import-Path: github.com/BurntSushi/toml
+Package-List: 
+ golang-github-burntsushi-toml-dev deb devel extra arch=all
+ golang-toml-dev deb oldlibs extra arch=all
+Extra-Source-Only: yes
+Directory: pool/main/g/golang-toml
+Priority: optional
+Section: misc
+
+Package: golang-toml
+Binary: golang-github-burntsushi-toml-dev, golang-toml-dev
+Version: 0.2.0+git20160717.21.9906417-1
+Maintainer: Debian Go Packaging Team <pkg-go-maintainers@lists.alioth.debian.org>
+Uploaders: Jelmer Vernooij <jelmer@debian.org>, Anthony Fok <foka@debian.org>, Tim Potter <tpot@hpe.com>
+Build-Depends: debhelper (>= 9), dh-golang, golang-any
+Architecture: all
+Standards-Version: 3.9.8
+Format: 3.0 (quilt)
+Files:
+ e7c218c9510d6629b191e9b2ffcf49fb 2318 golang-toml_0.2.0+git20160717.21.9906417-1.dsc
+ 97f2e75e0213a3ec77687ad2eb36bd70 35356 golang-toml_0.2.0+git20160717.21.9906417.orig.tar.xz
+ 97af23922438da9ddff465553e532aed 3696 golang-toml_0.2.0+git20160717.21.9906417-1.debian.tar.xz
+Vcs-Browser: https://anonscm.debian.org/cgit/pkg-go/packages/golang-toml.git
+Vcs-Git: https://anonscm.debian.org/git/pkg-go/packages/golang-toml.git
+Checksums-Sha256:
+ 16f6c1659b71b490476f4a590443bdfe2309678f21977e7a4a43fb19fdc9cf6e 2318 golang-toml_0.2.0+git20160717.21.9906417-1.dsc
+ 1647265ba4ba9be37596228418e9b37397cf983c638931722a743fa4bc3057c6 35356 golang-toml_0.2.0+git20160717.21.9906417.orig.tar.xz
+ 7cf33d10ae2fb0d24fa4b54c52c2ed61a775d83458363006423aba9efd7f1978 3696 golang-toml_0.2.0+git20160717.21.9906417-1.debian.tar.xz
+Homepage: https://github.com/BurntSushi/toml
+Go-Import-Path: github.com/BurntSushi/toml
+Package-List: 
+ golang-github-burntsushi-toml-dev deb devel extra arch=all
+ golang-toml-dev deb oldlibs extra arch=all
+Extra-Source-Only: yes
+Directory: pool/main/g/golang-toml
+Priority: optional
+Section: misc
+
+Package: golang-toml
+Binary: golang-github-burntsushi-toml-dev, golang-toml-dev
+Version: 0.3.0+git20170626.7.a368813-1
+Maintainer: Debian Go Packaging Team <pkg-go-maintainers@lists.alioth.debian.org>
+Uploaders: Jelmer Vernooij <jelmer@debian.org>, Anthony Fok <foka@debian.org>, Tim Potter <tpot@hpe.com>
+Build-Depends: debhelper (>= 9), dh-golang, golang-any
+Architecture: all
+Standards-Version: 4.0.0
+Format: 3.0 (quilt)
+Files:
+ fa1f87d0004be773dffef1bf8186d4c1 2343 golang-toml_0.3.0+git20170626.7.a368813-1.dsc
+ fc11e570fb2c3807774cf24bd3d047a9 37432 golang-toml_0.3.0+git20170626.7.a368813.orig.tar.xz
+ 069e7cd1cce5d2533edffd6bd61a965f 4012 golang-toml_0.3.0+git20170626.7.a368813-1.debian.tar.xz
+Vcs-Browser: https://anonscm.debian.org/cgit/pkg-go/packages/golang-toml.git
+Vcs-Git: https://anonscm.debian.org/git/pkg-go/packages/golang-toml.git
+Checksums-Sha256:
+ fc15b1e3f6c5ef482b76de6a30b58e4b22e47e15fb4ea6b016d15a59686a703c 2343 golang-toml_0.3.0+git20170626.7.a368813-1.dsc
+ 8a510c2693a1b5d9e8ffd350f85b7ba0c7a1bd68e00aff9c4974fe38f412d1b4 37432 golang-toml_0.3.0+git20170626.7.a368813.orig.tar.xz
+ ceec4c76419e96d054012c81d32fae777da67d213a491aafa1141c5785111d1e 4012 golang-toml_0.3.0+git20170626.7.a368813-1.debian.tar.xz
+Homepage: https://github.com/BurntSushi/toml
+Go-Import-Path: github.com/BurntSushi/toml
+Package-List: 
+ golang-github-burntsushi-toml-dev deb devel extra arch=all
+ golang-toml-dev deb oldlibs extra arch=all
+Directory: pool/main/g/golang-toml
+Priority: optional
+Section: misc
