@@ -103,3 +103,18 @@ data SourceRecord = SourceRecord {
 
 instance Ord SourceRecord where
   compare = comparing sname <> comparing version
+
+
+data Suite = Suite {
+  suiteRecords   :: SuiteRecords
+  ,suiteCache    :: SuiteCache
+  ,suiteProfile  :: SuiteProfile
+  ,suitePrebuild :: SuitePrebuild
+  } deriving (Show, Eq, Generic, Store)
+
+type OptionName = T.Text
+type OptionValue = T.Text
+type SuiteCache = (M.Map BinName SrcName, M.Map VirtualName [BinName])
+type SuiteProfile = M.Map OptionName OptionValue
+type SuiteRecords = M.Map SrcName SourceRecord
+type SuitePrebuild = M.Map BinName UrlFile

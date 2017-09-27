@@ -6,6 +6,7 @@ import           Data.Maybe
 import           Suite
 import           System.Console.CmdArgs.Implicit
 import           System.IO.Unsafe
+import           Utils                           (jq)
 import           Workaround                      (buildCache)
 
 
@@ -23,6 +24,9 @@ data DRepo = DRepo {
   ,outFile :: String
   } deriving (Show, Data, Typeable)
 
+
+defaultOutput = "./ok.dat"
+
 myArgs :: DRepo
 myArgs = DRepo {
   srcFile = "./Sources"
@@ -33,12 +37,19 @@ myArgs = DRepo {
     &= help "raw Packages control file"
     &= typFile
 
-  ,outFile = "./ok.dat"
+  ,outFile = defaultOutput
     &= help "the output files"
     &= typFile
   }
   &= summary "DRepo v1"
 
+
+
+----------------------------------------------------
 gg :: SrcName -> SourceRecord
 gg sn = fromJust $ findSource s sn
-s = unsafePerformIO $ loadSuite "./ok.dat"
+
+s = unsafePerformIO $ loadSuite defaultOutput
+
+jj = jq . gg
+----------------------------------------------------

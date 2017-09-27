@@ -128,9 +128,8 @@ buildCache fsrc fbin fout profile = do
       (_, bins, !rs) <- parseRawPackages fsrc fbin
       putStrLn $ "Start building Suite. -" ++ show (length rs)
       R.storeRecords (fout++".raw") rs
-      storeObject (buildDebDownloadCache bins)  (fout ++ ".urlCache")
 
-      let s = buildSuite profile rs
+      let s = buildSuite profile rs (buildDebDownloadCache bins)
       storeObject s fout
       putStrLn $ "Stroing result to " ++ fout
       return s
