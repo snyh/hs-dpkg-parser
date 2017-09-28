@@ -175,8 +175,6 @@ parsePkgList = parseOnly (trim p) where
        | len < 4 -> fail "Invalid package list format"
 
 
--- Package names must consist only of lower case letters (a-z), digits (0-9), plus (+) and minus (-) signs, and periods (.). They must be at least two characters long and must start with an alphanumeric character.
-
 pkgNameRange = S.fromList (['a'..'z'] ++ ['0'..'9'] ++ "+-.")
 pkgName :: Parser BinName
 pkgName = do
@@ -224,7 +222,7 @@ parseDepend = parseOnly p2 where
     n <- trim pkgName
     dVer <- trim pVer
     dArch <- trim pArch
-    return $ Depend n dVer dArch
+    return $ SimpleDepend n dVer dArch
 
   p2 :: Parser Depend
   p2 = do

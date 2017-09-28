@@ -1,22 +1,18 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings  #-}
 
-import qualified Data.Map                        as M
 import           Data.Maybe
 import           Suite
 import           System.Console.CmdArgs.Implicit
 import           System.IO.Unsafe
+import           Types
 import           Utils                           (jq)
 import           Workaround                      (buildCache)
-
-
-myProfile :: SuiteProfile
-myProfile = M.fromList [ ("Arch", "amd64") ]
 
 main = do
   c <- cmdArgs myArgs
   putStrLn "Start parsing...."
-  buildCache (srcFile c) (binFile c) (outFile c) myProfile
+  buildCache (srcFile c) (binFile c) (outFile c) (ArchName "amd64")
 
 data DRepo = DRepo {
   srcFile  :: String
@@ -43,11 +39,9 @@ myArgs = DRepo {
   }
   &= summary "DRepo v1"
 
-
-
 ----------------------------------------------------
 gg :: SrcName -> SourceRecord
-gg sn = fromJust $ findSource s sn
+gg sn = fromJust $ findSourceBySrcName s sn
 
 s = unsafePerformIO $ loadSuite defaultOutput
 

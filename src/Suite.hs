@@ -6,22 +6,15 @@
 
 
 module Suite (
-  SrcName,
-  BinName,
-  UrlFile,
-  BinaryRecord,
-  SourceRecord,
-  DSC,
-  Suite,
-  SuiteProfile,
+  canBeBuild,
+  dscHash,
+  badSourceRecords,
 
-  binOutput,
-
+  reduceDepend,
   loadSuite,
-  findSource,
 
+  findSourceBySrcName,
   priorities,
-  wow,
 
   inspect,
 
@@ -29,11 +22,10 @@ module Suite (
   buildVirtuals,
   buildBinaries,
   buildSourceRecord,
-  dep2src,
   findDepends,
 
   buildSuite,
-  bin2src,
+  bin2srcName,
 ) where
 
 import           Data.Either
@@ -53,16 +45,16 @@ import           Data.List
 import           Data.Monoid
 import qualified Data.Text           as T
 
-
---type Suite = (SuiteRecords, SuiteCache, SuiteProfile, SuitePrebuild)
-
 type Suite' = S.State Suite
+
+dscHash :: DSC -> HashString
+dscHash = T.pack . hashArray . map sha256 . files
 
 
 buildBinaries :: R.Record -> M.Map T.Text BinaryRecord
-buildBinaries r = M.fromList $ map build allBinaries where
-  allBinaries :: [T.Text]
-  allBinaries = filter blackUdeb $ R.getArray "Binary" "," r where
+buildBinaries r = M.fromList $ map build bins where
+  bins :: [T.Text]
+  bins = filter blackUdeb $ R.getArray "Binary" "," r where
     blackUdeb bn = t == "deb" where
       (t, _ ,_) = M.findWithDefault ("deb", "", "") bn allOthers
 
@@ -109,10 +101,10 @@ buildDepends' str = case R.parseDepends str of
                       Left err   -> trace (show err) []
                       Right deps -> deps
 
-buildSuite :: SuiteProfile -> [R.Record] -> SuitePrebuild -> Suite
-buildSuite profile rs c = s2 where
-  s = Suite records cache profile M.empty
-  s1 = S.execState (stage1 >> stage2) s
+buildSuite :: BootstrapFunc -> Architecture -> SuitePrebuild -> [R.Record] -> Suite
+buildSuite bfn arch c rs = s2 where
+  s = Suite records cache arch M.empty
+  s1 = S.execState (stage1 bfn >> stage2) s
   s2 = associatePrebuild c s1
 
   cache = (pkgs, virtuals records) where
@@ -148,18 +140,9 @@ unionWithKey = M.mergeWithKey (\_ v1 v2 -> Just (v1 <> v2)) id id
 
 virtuals :: SuiteRecords -> M.Map BinName [BinName]
 virtuals = foldr bFn M.empty . M.elems where
-   bFn :: SourceRecord -> M.Map VirtualName [BinName] -> M.Map VirtualName [BinName]
-   bFn sr = unionWithKey vs' where
-     vs' = buildVirtuals sr
-
-binOutput :: SourceRecord -> BinName -> HashString
-binOutput sr bn = fromMaybe "PendingHash" (shash sr)
-
-badSourceRecords :: SuiteRecords -> [SourceRecord]
-badSourceRecords = filter (isNothing . shash) . M.elems
-
-dscHash :: DSC -> HashString
-dscHash d = T.pack $ hashArray $ map sha256 $ files d
+  bFn :: SourceRecord -> M.Map VirtualName [BinName] -> M.Map VirtualName [BinName]
+  bFn sr = unionWithKey vs' where
+    vs' = buildVirtuals sr
 
 getRecord :: SrcName -> Suite' (Maybe SourceRecord)
 getRecord sn = do
@@ -173,76 +156,61 @@ putRecord sr = do
   S.put $ s { suiteRecords = M.insert (sname sr) sr rs }
   return ()
 
-filterBuildDepends :: Suite -> SourceRecord -> [Depend]
-filterBuildDepends s sr = filterDeps parch deps where
-  deps = buildDepends sr
+findDepends :: Suite -> SourceRecord -> Either [T.Text] [SourceRecord]
+findDepends s sr = if null badDeps then Right goodSrcs else Left badNames where
+    (goodDeps, badDeps) = partition (isJust . reduceDepend s) (buildDepends sr)
 
-  filterDeps :: Maybe Architecture -> [Depend] -> [Depend]
-  filterDeps _ [] = []
-  filterDeps Nothing xs         = xs
-  filterDeps (Just arch) (x:xs) = if p arch x then x: rem' else rem' where
-    rem' = filterDeps (Just arch) xs
-    p :: Architecture -> Depend -> Bool
-    p a (OneOfDepend xs')   = any (p a) xs'
-    p a (Depend _ _ aLimit) = a `elem` aLimit
+    badNames = map (T.pack . show) badDeps
+    goodSrcs = map depSrc goodDeps
 
-  parch :: Maybe Architecture
-  parch = M.lookup "Arch" (suiteProfile s) >>= \i ->  case R.parseOnly R.pArchitecture i of
-      Left _  -> Nothing
-      Right x -> return x
+    depSrc :: Depend -> SourceRecord
+    depSrc d = fromJust $ findSourceByBinName s (dName d)
 
+-- | @reduceDepend s d@ 根据仓库@s@的状态，
+--
+-- 1. 若@d@为'Types.OneOfDepend', 则将@d@降级为'Types.SimpleDepend'.
+-- 2. 若@d@为'Types.SimpleDepend',
+--
+--      - 若@s@满足@d@则返回@Just d@
+--      - 否则返回@Nothing@
+reduceDepend :: Suite -> Depend -> Maybe Depend
+reduceDepend s d@SimpleDepend{ dName=n, dArchLimit=aLimit } = if ok then Just d else Nothing where
+  ok = canIgnore || hasTheSource
+  hasTheSource = isJust $ bin2srcName s n
+  canIgnore = not (null aLimit) && (suiteArch s `notElem` aLimit)
+reduceDepend s (OneOfDepend []) = Nothing
+reduceDepend s (OneOfDepend (d:ds)) = if isJust d' then d' else reduceDepend s (OneOfDepend ds) where
+  d' = reduceDepend s d
 
-findSource :: Suite -> SrcName ->  Maybe SourceRecord
-findSource s n = M.lookup n $ suiteRecords s
-
-findDepends :: Suite -> SourceRecord -> Either [BinName] [SourceRecord]
-findDepends s sr = deps where
-    deps :: Either [BinName] [SourceRecord]
-    deps = if null failed then Right success else Left failed  where
-      failed :: [BinName]
-      failed = map fst $ filter (isNothing . snd) cache
-
-      success :: [SourceRecord]
-      success = map (fromJust . snd) $ filter (isJust . snd) cache
-
-      cache :: [(BinName, Maybe SourceRecord)]
-      cache = map (depName &&& (dep2src s >=> findSource s)) (filterBuildDepends s sr)
-
-    depName :: Depend -> BinName
-    depName (OneOfDepend []) = ""
-    depName (OneOfDepend (x:xs)) = depName x <> " or " <> depName (OneOfDepend xs)
-    depName d = dName d
-
-allBins :: Suite -> [BinaryRecord]
-allBins s = concatMap (M.elems . outputs) $ M.elems $ suiteRecords s
+listAllBinaries :: Suite -> [BinaryRecord]
+listAllBinaries = concatMap (M.elems . outputs) . M.elems . suiteRecords
 
 priorities :: Suite -> [(Int, T.Text)]
-priorities s = sortOn fst $ fmap (length &&& head) $ (group . sort) $ map priority $ allBins s
+priorities s = sortOn fst $ fmap (length &&& head) $ (group . sort) $ map priority $ listAllBinaries s
 
-dep2src :: Suite -> Depend -> Maybe SrcName
-dep2src _ (OneOfDepend []) = Nothing
-dep2src s (OneOfDepend (x:xs)) = let t = dep2src s x in if isJust t then t else dep2src s (OneOfDepend xs)
-dep2src s dep                  = bin2src s $ dName dep
+-- | stage1 fn 根据fn的返回值来标记初始化时各SourceRecord的shash值
+stage1 :: (SourceRecord -> Maybe HashString) -> Suite' ()
+stage1 fn = do
+  s <- S.get
+  let trySetSHash sr = case fn sr of
+        Nothing -> sr
+        Just sh -> sr { shash = Just sh }
+      ss' = M.map (trySetSHash) (suiteRecords s)
+  S.put s { suiteRecords = ss' }
 
-calcByDSC :: SourceRecord -> Suite' ()
-calcByDSC sr = putRecord (sr { shash = Just $ dscHash $ dsc sr })
 
--- stage1 直接根据dsc来设置base pkgs的shash
-stage1 :: Suite' ()
-stage1 = S.get >>= mapM_ calcByDSC . _essentials where
-  _essentials :: Suite -> [SourceRecord]
-  _essentials s = filter fn $ M.elems (suiteRecords s) where
-    fn :: SourceRecord -> Bool
-    fn sr = any _fpriority (M.elems $ outputs sr)
-    _fpriority = (`elem` ["required", "important"]) . priority
+-- | badSourceRecords __/s/__ 返回仓库__/s/__中无法编译的源码包名列表
+badSourceRecords :: Suite -> [SrcName]
+badSourceRecords = map sname . filter (isNothing . shash) . M.elems . suiteRecords
 
--- stage2 根据stage1的结果，重复尝试计算shash
+-- | stage2 根据stage1的结果，重复尝试计算shash
 stage2 :: Suite' ([Int], Int)
 stage2 = do
   r <- hardwork
   s <- S.get
-  return (r, length $ badSourceRecords $ suiteRecords s)
+  return (r, length $ badSourceRecords s)
   where
+
     hardwork :: Suite' [Int]
     hardwork = do
       x <- calc
@@ -254,11 +222,16 @@ stage2 = do
           return (x:xs)
 
 loadSuite :: FilePath -> IO Suite
-loadSuite fp = loadObject fp
+loadSuite = loadObject
 
+findSourceByBinName :: Suite -> BinName -> Maybe SourceRecord
+findSourceByBinName s n = bin2srcName s n >>= findSourceBySrcName s
 
-bin2src :: Suite -> BinName -> Maybe SrcName
-bin2src s bn = debugR where
+findSourceBySrcName :: Suite -> SrcName -> Maybe SourceRecord
+findSourceBySrcName s n = M.lookup n $ suiteRecords s
+
+bin2srcName :: Suite -> BinName -> Maybe SrcName
+bin2srcName s bn = debugR where
   (xx, vs) = suiteCache s
   debugR = if isNothing result then trace ("Can't find " <> T.unpack bn) result else result
 
@@ -271,12 +244,13 @@ bin2src s bn = debugR where
   v =  join (listToMaybe . mapMaybe (`M.lookup` xx) <$> M.lookup bn vs)
 
 
--- canBeCalc 判断此Record是否可以被直接计算出shash
--- 1. BuildDepends 为空 && shash == Nothing --> True
--- 2. forall e in BuildDepends, the shash of e isn't Nothing -> True
+-- | @canBeBuild s sr@ 判断此'Types.SourceRecord'是否可以被直接计算出shash
+--
+-- 1. @buildDepends sr@ 为空 && @shash sr == Nothing@  --> True
+-- 2. forall e in BuildDepends of sr, the shash of e isn't Nothing -> True
 -- 3. Otherwie -> False
-canBeCalc :: Suite -> SourceRecord -> Bool
-canBeCalc s sr = if
+canBeBuild :: Suite -> SourceRecord -> Bool
+canBeBuild s sr = if
   | isJust $ shash sr -> False
   | null . buildDepends $ sr -> True
   | otherwise -> case v of
@@ -287,12 +261,12 @@ canBeCalc s sr = if
     v = p2 sr
     p2 sr' = all (isJust . shash) <$> findDepends s sr'
 
--- 生成所有零依赖的shash
+-- | 生成所有零依赖的shash
 calc :: Suite' Int
 calc = do
   s <- S.get
   let sr = suiteRecords s
-      ss = filter (canBeCalc s) $ M.elems sr
+      ss = filter (canBeBuild s) $ M.elems sr
   oks <- mapM tryCalc ss
   return $ length oks
 
@@ -306,7 +280,6 @@ tryCalc sr = do
 
   let myhash = dscHash $ dsc sr :: HashString
 
---  let depHashs = findDepends s sr >>= mapM shash :: Either [String] [HashString]
   let depHashs = case findDepends s sr of
         Left err -> trace (show err) $ Left err
         Right deps -> case mapM shash deps of
@@ -319,7 +292,7 @@ tryCalc sr = do
 
 
 binHashS :: Suite -> BinName -> Maybe HashString
-binHashS s n = bin2src s n >>= findSource s >>= binHash n where
+binHashS s n = bin2srcName s n >>= findSourceBySrcName s >>= binHash n where
   binHash :: BinName -> SourceRecord -> Maybe HashString
   binHash n' sr = ensure >> shash sr >>= \h1 -> Just $ T.pack (hashArray [h1, n']) where
     ensure = M.lookup n' (outputs sr)
@@ -339,29 +312,22 @@ associatePrebuild' c s = M.fromList $ mapMaybe fn is where
     fn2 (Nothing, _) = Nothing
     fn2 (Just x, f)  = Just (x, f)
 
+inspect :: Suite -> [(BinName, Maybe UrlFile)]
+inspect s = h1 where
+  bins = map bname $ listAllBinaries s
+
+  h1 :: [(BinName, Maybe UrlFile)]
+  h1 = map (wow s) bins
 
 
-
-
-wow :: BinName -> Suite -> (Maybe SourceRecord, Maybe UrlFile)
-wow n s =  (sr, u) where
-  p :: SuitePrebuild
-  p = suitePrebuild s
-
-  sr :: Maybe SourceRecord
-  sr = bin2src s n >>= findSource s
-
+wow :: Suite -> BinName -> (BinName, Maybe UrlFile)
+wow s n = (n, u) where
   u :: Maybe UrlFile
   u = do
     h <- binHashS s n
-    M.lookup h p
+    M.lookup h (suitePrebuild s)
 
-inspect :: Suite -> [(SourceRecord, Maybe UrlFile)]
-inspect s = h2 where
-  bins = map bname $ allBins s
-
-  h1 :: [(Maybe SourceRecord, Maybe UrlFile)]
-  h1 = map (`wow` s) bins
-
-  h2 :: [(SourceRecord, Maybe UrlFile)]
-  h2 = map (first fromJust) h1
+buildPackage :: Suite -> BinName -> IO ()
+buildPackage s n = undefined where
+  theSrc = findSourceByBinName s n
+  depends = undefined

@@ -12,7 +12,7 @@ import qualified Data.Map          as M
 import           Data.Monoid
 import qualified Data.Text         as T
 import qualified Record            as R
-import           Suite             (Suite, SuiteProfile, buildSuite)
+import           Suite             (buildSuite, dscHash)
 import           Text.Printf
 import           Types
 import           Utils
@@ -115,8 +115,12 @@ parseRawPackages fsrc fbin = let
     printf "%s has been parsed to %d binary records\n" fbin (length bins)
     return (srcs, bins, merge srcs bins)
 
-buildCache :: FilePath -> FilePath -> FilePath -> SuiteProfile -> IO Suite
-buildCache fsrc fbin fout profile = do
+
+bootstrapByDSC :: BootstrapFunc
+bootstrapByDSC sr = if isEssential sr then Just $ dscHash $ dsc sr else Nothing
+
+buildCache :: FilePath -> FilePath -> FilePath -> Architecture -> IO Suite
+buildCache fsrc fbin fout arch = do
   strOrExc <- try (loadObject fout)
   case strOrExc of
       (Left (_::SomeException)) -> doBuilding
@@ -129,7 +133,7 @@ buildCache fsrc fbin fout profile = do
       putStrLn $ "Start building Suite. -" ++ show (length rs)
       R.storeRecords (fout++".raw") rs
 
-      let s = buildSuite profile rs (buildDebDownloadCache bins)
+      let s = buildSuite bootstrapByDSC arch (buildDebDownloadCache bins) rs
       storeObject s fout
       putStrLn $ "Stroing result to " ++ fout
       return s
