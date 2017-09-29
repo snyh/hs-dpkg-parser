@@ -15,6 +15,7 @@ main = hspec $ do
   specUtils
   specParser
   specArchitecture
+  specHash
 
 prop_sameLengthForPartitionN :: [String] -> Property
 prop_sameLengthForPartitionN xs = forAll (choose (0, length xs - 1)) checker where
@@ -24,17 +25,32 @@ prop_sameLengthForPartitionN xs = forAll (choose (0, length xs - 1)) checker whe
     length xs == length p1 + length p2
 
 specUtils :: Spec
-specUtils = do
-  describe "Utils.PartitionN" $ do
+specUtils = describe "Utils.PartitionN" $
     it "Shouldn't change the input set length" $ property prop_sameLengthForPartitionN
 
 
 specArchitecture :: Spec
-specArchitecture = do
-  describe "Compare Architectures" $ do
+specArchitecture = describe "Compare Architectures" $ do
     it "i386 != amd64" $ ArchName "i386" /= ArchName "amd64"
     it "i386 == any" $ ArchAny == ArchName "i386"
     it "all != any" $ ArchAll /= ArchAny
+
+
+specHash :: Spec
+specHash = describe "hashIt with string" $
+    let str = "abc" :: String
+        strU = "hello world 你好\n" :: String
+        result = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        resultU = "0f8ec95a2d72a48aebfbb2a082b04f3bd53be8d4dba59a8e31e82c504bae50d8"
+    in do
+      it "Comparing String" $
+        hashIt str
+        `shouldBe`
+        result
+      it "Comparing Unicode String" $
+        hashIt strU
+        `shouldBe`
+        resultU
 
 specParser :: Spec
 specParser = do
@@ -63,7 +79,7 @@ specParser = do
 
   describe "R.parseXXX" $ do
     let str = "liba52-0.7.4 (= 0.7.4-18) [i386] <buildd>"
-        dep = Depend "liba52-0.7.4" ver [ArchName "i386"]
+        dep = SimpleDepend "liba52-0.7.4" ver [ArchName "i386"]
         ver = VerEQ $ Version 0 "0.7.4" "18"
       in it ("parseDepends: " ++ T.unpack str) $ R.parseDepends str `shouldBe` Right [dep]
 

@@ -18,14 +18,16 @@ import           Codec.Compression.GZip     as GZ
 import           Crypto.Hash                (Digest, SHA256, hash)
 import qualified Data.Aeson                 as JSON
 import qualified Data.ByteString            as BS
-import           Data.ByteString.Char8      (pack)
 import qualified Data.ByteString.Lazy       as BL
+import qualified Data.ByteString.UTF8       as B
 import           Data.List
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Store                 (Store, decode, encode)
 import           Data.String                (IsString)
-import           Network.Curl.Download.Lazy (openLazyURI)
+import           Data.String.ToString
+import           Network.Curl.Download.Lazy (openLazyURIWithOpts)
+import           Network.Curl.Opts          (CurlOption (CurlNoProgress))
 import           System.Directory           (removeFile)
 import           System.FilePath
 import           System.IO
@@ -33,15 +35,15 @@ import           System.Process             (callCommand)
 import           Text.Printf
 import           Text.Read
 
-hashArray :: (Show a, Monoid a, Ord a) => [a] -> String
+hashArray :: (ToString a, Monoid a, Ord a) => [a] -> String
 hashArray xs = hashIt $ foldr1 mappend $ nub $ sort xs
 
-hashIt :: (Show a) => a -> String
-hashIt s = show (hash $ pack $ show s :: Digest SHA256)
 
+hashIt :: (ToString a) => a -> String
+hashIt s = show (hash $ B.fromString $ toString s :: Digest SHA256)
 
 openURI' :: FilePath -> IO BL.ByteString
-openURI' f = openLazyURI f >>= \case
+openURI' f = openLazyURIWithOpts [CurlNoProgress False] f >>= \case
   (Right content) -> return content
   (Left err)      -> error ("handle \"" <> f <> "\" :" <> err)
 

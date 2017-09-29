@@ -147,3 +147,4 @@ buildDebDownloadCache = foldr build M.empty where
       (R.get "SHA256" r)
       (readDefault 0 $ T.unpack $ R.get "Size" r)
       (R.get "Filename" r)
+

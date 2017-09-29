@@ -16,7 +16,7 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Suite Record Workaround Utils Types
+  exposed-modules:     Suite Record Workaround Utils Types Fetcher
   build-depends:       base >= 4.7 && < 5
                      , aeson
                      , bytestring
@@ -35,6 +35,9 @@ library
                      , terminal-progress-bar
                      , mtl
                      , download-curl
+                     , curl
+                     , tostring
+                     , utf8-string
   default-language:    Haskell2010
 executable drepo
   hs-source-dirs:      app

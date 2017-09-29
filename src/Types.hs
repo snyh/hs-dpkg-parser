@@ -139,7 +139,7 @@ data Suite = Suite {
   ,suiteCache    :: SuiteBinNameCache
   ,suiteArch     :: Architecture
   ,suitePrebuild :: SuitePrebuild
-  } deriving (Show, Eq, Generic, Store)
+  } deriving (Show, Generic, Store)
 
 type SuiteBinNameCache = (M.Map BinName SrcName, M.Map VirtualName [BinName])
 

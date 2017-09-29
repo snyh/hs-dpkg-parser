@@ -15,6 +15,9 @@ module Suite (
   findSourceBySrcName,
   priorities,
 
+  listAllVirtuals,
+  listAllBinaries,
+
   inspect,
 
   findDepends,
@@ -139,6 +142,9 @@ listAllVirtuals = foldr bFn M.empty . M.elems . suiteRecords where
   bFn sr = unionWithKey vs' where
     vs' = extractVirtuals sr
 
+listAllBinaries :: Suite -> [BinaryRecord]
+listAllBinaries = concatMap (M.elems . outputs) . M.elems . suiteRecords
+
 putRecord :: SourceRecord -> Suite' ()
 putRecord sr = do
   s <- S.get
@@ -155,6 +161,7 @@ findDepends s sr = if null badDeps then Right goodSrcs else Left badNames where
 
     depSrc :: Depend -> SourceRecord
     depSrc d = fromJust $ findSourceByBinName s (dName d)
+
 
 -- | @reduceDepend s d@ 根据仓库@s@的状态，
 --
@@ -175,9 +182,6 @@ reduceDepend _ IgnoreDepend = Just IgnoreDepend
 reduceDepend _ (OneOfDepend []) = Nothing
 reduceDepend s (OneOfDepend (d:ds)) = if isJust d' then d' else reduceDepend s (OneOfDepend ds) where
   d' = reduceDepend s d
-
-listAllBinaries :: Suite -> [BinaryRecord]
-listAllBinaries = concatMap (M.elems . outputs) . M.elems . suiteRecords
 
 -- | @priorities s@ list the tuple of priority group and its counts
 --
@@ -308,7 +312,6 @@ inspect s = h1 where
 
   h1 :: [(BinName, Maybe UrlFile)]
   h1 = map (wow s) bins
-
 
 wow :: Suite -> BinName -> (BinName, Maybe UrlFile)
 wow s n = (n, u) where
