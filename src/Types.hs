@@ -15,7 +15,7 @@ import qualified Data.Text    as T
 import           GHC.Generics
 import           Utils        (hashArray)
 
-type HashString = T.Text
+type OutputHash = T.Text
 
 -- | BinName names must consist only of lower case letters (a-z), digits (0-9), plus (+) and minus (-) signs, and periods (.). They must be at least two characters long and must start with an alphanumeric character.
 type BinName = T.Text
@@ -24,8 +24,6 @@ type BinName = T.Text
 type SrcName = T.Text
 
 type VirtualName = BinName
-
-type DependsRecord = T.Text
 
 data Version = Version {
   verEpoch     :: Integer
@@ -99,14 +97,14 @@ data BinaryRecord = BinaryRecord {
  } deriving (Show, Eq, Generic, FromJSON, ToJSON, Store)
 
 -- | @binaryHash s n@ calculate the hash value of binary record @n@ in the @s@
-binaryHash :: SourceRecord -> BinName -> Maybe HashString
+binaryHash :: SourceRecord -> BinName -> Maybe OutputHash
 binaryHash s n = do
   sh <- shash s
   bin <- M.lookup n (outputs s)
   return $ T.pack $ hashArray [sh, bname bin]
 
 data UrlFile = UrlFile {
-  sha256 :: HashString
+  sha256 :: T.Text
   ,size  :: Int
   ,url   :: T.Text
   } deriving (Show, Eq, Generic, FromJSON, ToJSON, Store)
@@ -118,7 +116,7 @@ data DSC = DSC {
 
 data SourceRecord = SourceRecord {
   sname         :: SrcName
-  ,shash        :: Maybe HashString
+  ,shash        :: Maybe OutputHash
   ,version      :: Version
   ,architecture :: T.Text
   ,dsc          :: DSC
@@ -138,18 +136,14 @@ isEssential sr = any _fpriority (M.elems $ outputs sr) where
 -- | Suite封装了一个deb仓库
 data Suite = Suite {
   suiteRecords   :: SuiteRecords
-  ,suiteCache    :: SuiteCache
+  ,suiteCache    :: SuiteBinNameCache
   ,suiteArch     :: Architecture
   ,suitePrebuild :: SuitePrebuild
   } deriving (Show, Eq, Generic, Store)
 
-type OptionName = T.Text
-type OptionValue = T.Text
+type SuiteBinNameCache = (M.Map BinName SrcName, M.Map VirtualName [BinName])
 
-type SuiteCache = (M.Map BinName SrcName, M.Map VirtualName [BinName])
-
-
-type BootstrapFunc = SourceRecord -> Maybe HashString
+type BootstrapFunc = SourceRecord -> Maybe OutputHash
 
 type SuiteRecords = M.Map SrcName SourceRecord
 type SuitePrebuild = M.Map BinName UrlFile

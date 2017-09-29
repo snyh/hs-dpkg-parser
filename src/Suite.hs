@@ -42,7 +42,7 @@ import qualified Data.Text           as T
 
 type Suite' = S.State Suite
 
-dscHash :: DSC -> HashString
+dscHash :: DSC -> OutputHash
 dscHash = T.pack . hashArray . map sha256 . files
 
 
@@ -187,7 +187,7 @@ priorities :: Suite -> [(Int, T.Text)]
 priorities s = sortOn fst $ fmap (length &&& head) $ (group . sort) $ map priority $ listAllBinaries s
 
 -- | stage1 fn 根据fn的返回值来标记初始化时各SourceRecord的shash值
-stage1 :: (SourceRecord -> Maybe HashString) -> Suite' ()
+stage1 :: (SourceRecord -> Maybe OutputHash) -> Suite' ()
 stage1 fn = do
   s <- S.get
   let trySetSHash sr = case fn sr of
@@ -272,7 +272,7 @@ tryCalc sr = do
 
   let sethash h = putRecord (sr { shash = Just h }) >> return True
 
-  let myhash = dscHash $ dsc sr :: HashString
+  let myhash = dscHash $ dsc sr :: OutputHash
 
   let depHashs = case findDepends s sr of
         Left err -> trace (show err) $ Left err
@@ -280,25 +280,25 @@ tryCalc sr = do
             Nothing -> Left ["HH"]
             Just x  -> Right x
 
-  let jh = T.pack . hashArray . (myhash:) <$> depHashs :: Either [T.Text] HashString
+  let jh = T.pack . hashArray . (myhash:) <$> depHashs :: Either [T.Text] OutputHash
 
   either failMsg sethash jh
 
 
-binHashS :: Suite -> BinName -> Maybe HashString
+binHashS :: Suite -> BinName -> Maybe OutputHash
 binHashS s n = findSourceByBinName s n >>= (`binaryHash` n)
 
 associatePrebuild :: SuitePrebuild -> Suite -> Suite
 associatePrebuild c s = s { suitePrebuild = associatePrebuild' c s }
 
-associatePrebuild' :: SuitePrebuild -> Suite -> M.Map HashString UrlFile
+associatePrebuild' :: SuitePrebuild -> Suite -> M.Map OutputHash UrlFile
 associatePrebuild' c s = M.fromList $ mapMaybe fn is where
   is :: [(BinName, UrlFile)]
   is = M.toList c
 
-  fn :: (BinName, UrlFile) -> Maybe (HashString, UrlFile)
+  fn :: (BinName, UrlFile) -> Maybe (OutputHash, UrlFile)
   fn = fn2 . first (binHashS s) where
-    fn2 :: (Maybe HashString, UrlFile) -> Maybe (HashString, UrlFile)
+    fn2 :: (Maybe OutputHash, UrlFile) -> Maybe (OutputHash, UrlFile)
     fn2 (Nothing, _) = Nothing
     fn2 (Just x, f)  = Just (x, f)
 
