@@ -13,6 +13,7 @@ import           Data.Ord
 import           Data.Store
 import qualified Data.Text    as T
 import           GHC.Generics
+import           Utils        (hashArray)
 
 type HashString = T.Text
 
@@ -47,7 +48,13 @@ data LimitVer =
 
 type LimitArch = [Architecture]
 
-data Architecture = ArchAny | ArchNative | ArchAll | ArchName T.Text | ArchIsNot Architecture
+data Architecture =
+  ArchAny
+  | ArchNative
+  | ArchAll
+  -- | @ArchName "amd64"@
+  | ArchName T.Text
+  | ArchIsNot Architecture
   deriving (Show, Generic, FromJSON, ToJSON, Store)
 
 instance Eq Architecture where
@@ -69,7 +76,12 @@ instance Eq Architecture where
   (==) _ _                       = False
 
 data Depend =
-  OneOfDepend [Depend]
+  -- | 可以安全的被忽略
+  IgnoreDepend
+
+  -- | 满足任意一个Depend即可
+    | OneOfDepend [Depend]
+
   | SimpleDepend {
       dName          :: BinName
       ,dVersionLimit :: LimitVer
@@ -85,6 +97,13 @@ data BinaryRecord = BinaryRecord {
   ,priority     :: T.Text
   ,architecture :: T.Text
  } deriving (Show, Eq, Generic, FromJSON, ToJSON, Store)
+
+-- | @binaryHash s n@ calculate the hash value of binary record @n@ in the @s@
+binaryHash :: SourceRecord -> BinName -> Maybe HashString
+binaryHash s n = do
+  sh <- shash s
+  bin <- M.lookup n (outputs s)
+  return $ T.pack $ hashArray [sh, bname bin]
 
 data UrlFile = UrlFile {
   sha256 :: HashString

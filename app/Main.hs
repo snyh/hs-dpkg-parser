@@ -6,7 +6,7 @@ import           Suite
 import           System.Console.CmdArgs.Implicit
 import           System.IO.Unsafe
 import           Types
-import           Utils                           (jq)
+import           Utils                           (jq, loadObject)
 import           Workaround                      (buildCache)
 
 main = do
@@ -43,7 +43,8 @@ myArgs = DRepo {
 gg :: SrcName -> SourceRecord
 gg sn = fromJust $ findSourceBySrcName s sn
 
-s = unsafePerformIO $ loadSuite defaultOutput
+s :: Suite
+s = unsafePerformIO $ loadObject defaultOutput
 
 jj = jq . gg
 ----------------------------------------------------

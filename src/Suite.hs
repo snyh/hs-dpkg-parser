@@ -11,17 +11,12 @@ module Suite (
   badSourceRecords,
 
   reduceDepend,
-  loadSuite,
 
   findSourceBySrcName,
   priorities,
 
   inspect,
 
-  virtuals,
-  buildVirtuals,
-  buildBinaries,
-  buildSourceRecord,
   findDepends,
 
   buildSuite,
@@ -36,7 +31,7 @@ import           Debug.Trace
 import qualified Record              as R
 import           System.FilePath     (takeExtension)
 import           Types
-import           Utils               (fallback, hashArray, loadObject)
+import           Utils               (fallback, hashArray)
 
 import           Control.Arrow
 import           Control.Monad
@@ -51,8 +46,8 @@ dscHash :: DSC -> HashString
 dscHash = T.pack . hashArray . map sha256 . files
 
 
-buildBinaries :: R.Record -> M.Map T.Text BinaryRecord
-buildBinaries r = M.fromList $ map build bins where
+toBinaries :: R.Record -> M.Map T.Text BinaryRecord
+toBinaries r = M.fromList $ map build bins where
   bins :: [T.Text]
   bins = filter blackUdeb $ R.getArray "Binary" "," r where
     blackUdeb bn = t == "deb" where
@@ -86,15 +81,15 @@ buildDSC xs = DSC dscName fs where
   fs = rights $ map R.parseUrl xs
   dscName = foldr (\i r -> let p = url i in if takeExtension (T.unpack p) == ".dsc" then p else r) "unknown" fs
 
-buildSourceRecord :: R.Record -> SourceRecord
-buildSourceRecord r = SourceRecord
+toSourceRecord :: R.Record -> SourceRecord
+toSourceRecord r = SourceRecord
   (R.get "Package" r)
   Nothing
   (case R.parseVersion $ R.get "Version" r of Left err -> error (show err) ; Right v -> v)
   (R.get "Architecture" r)
   (buildDSC (R.getMultilines "Checksums-Sha256" r))
   (buildDepends' (R.get "Build-Depends" r))
-  (buildBinaries r)
+  (toBinaries r)
 
 buildDepends' :: T.Text -> [Depend]
 buildDepends' str = case R.parseDepends str of
@@ -107,7 +102,7 @@ buildSuite bfn arch c rs = s2 where
   s1 = S.execState (stage1 bfn >> stage2) s
   s2 = associatePrebuild c s1
 
-  cache = (pkgs, virtuals records) where
+  cache = (pkgs, listAllVirtuals s) where
     pkgs = foldr bFn M.empty (M.elems records) where
       bFn sr m = foldr (\bn m' -> M.insert bn v m') m bs where
         v = sname sr
@@ -115,7 +110,7 @@ buildSuite bfn arch c rs = s2 where
 
   records = foldr' _insert M.empty rs
   _insert i s = let
-    r = buildSourceRecord i
+    r = toSourceRecord i
     myname = sname r
     chooseNewer :: SourceRecord -> SourceRecord -> SourceRecord
     chooseNewer a b =
@@ -127,8 +122,8 @@ buildSuite bfn arch c rs = s2 where
     in
     M.insertWith chooseNewer myname r s
 
-buildVirtuals :: SourceRecord -> M.Map VirtualName [BinName]
-buildVirtuals = foldr bFn M.empty . outputs where
+extractVirtuals :: SourceRecord -> M.Map VirtualName [BinName]
+extractVirtuals = foldr bFn M.empty . outputs where
   bFn :: BinaryRecord -> M.Map VirtualName [BinName] -> M.Map VirtualName [BinName]
   bFn b = unionWithKey thisMap where
     thisBName = bname b
@@ -138,16 +133,11 @@ buildVirtuals = foldr bFn M.empty . outputs where
 unionWithKey :: M.Map VirtualName [BinName] -> M.Map VirtualName [BinName] -> M.Map VirtualName [BinName]
 unionWithKey = M.mergeWithKey (\_ v1 v2 -> Just (v1 <> v2)) id id
 
-virtuals :: SuiteRecords -> M.Map BinName [BinName]
-virtuals = foldr bFn M.empty . M.elems where
+listAllVirtuals :: Suite -> M.Map BinName [BinName]
+listAllVirtuals = foldr bFn M.empty . M.elems . suiteRecords where
   bFn :: SourceRecord -> M.Map VirtualName [BinName] -> M.Map VirtualName [BinName]
   bFn sr = unionWithKey vs' where
-    vs' = buildVirtuals sr
-
-getRecord :: SrcName -> Suite' (Maybe SourceRecord)
-getRecord sn = do
-  s <- S.get
-  return $ M.lookup sn $ suiteRecords s
+    vs' = extractVirtuals sr
 
 putRecord :: SourceRecord -> Suite' ()
 putRecord sr = do
@@ -158,10 +148,10 @@ putRecord sr = do
 
 findDepends :: Suite -> SourceRecord -> Either [T.Text] [SourceRecord]
 findDepends s sr = if null badDeps then Right goodSrcs else Left badNames where
-    (goodDeps, badDeps) = partition (isJust . reduceDepend s) (buildDepends sr)
+    (goodDeps, badDeps) = partition isJust $ map (reduceDepend s) (buildDepends sr)
 
     badNames = map (T.pack . show) badDeps
-    goodSrcs = map depSrc goodDeps
+    goodSrcs = map depSrc $ filter (/= IgnoreDepend) $ catMaybes goodDeps
 
     depSrc :: Depend -> SourceRecord
     depSrc d = fromJust $ findSourceByBinName s (dName d)
@@ -172,19 +162,27 @@ findDepends s sr = if null badDeps then Right goodSrcs else Left badNames where
 -- 2. 若@d@为'Types.SimpleDepend',
 --
 --      - 若@s@满足@d@则返回@Just d@
+--      - 若@dArchLimit@与@s@不匹配则直接忽略返回@Just IgnoreDepend@
 --      - 否则返回@Nothing@
 reduceDepend :: Suite -> Depend -> Maybe Depend
-reduceDepend s d@SimpleDepend{ dName=n, dArchLimit=aLimit } = if ok then Just d else Nothing where
-  ok = canIgnore || hasTheSource
+reduceDepend s d@SimpleDepend{ dName=n, dArchLimit=aLimit } =
+  if | canIgnore -> Just IgnoreDepend
+     | hasTheSource -> Just d
+     | otherwise -> Nothing where
   hasTheSource = isJust $ bin2srcName s n
   canIgnore = not (null aLimit) && (suiteArch s `notElem` aLimit)
-reduceDepend s (OneOfDepend []) = Nothing
+reduceDepend _ IgnoreDepend = Just IgnoreDepend
+reduceDepend _ (OneOfDepend []) = Nothing
 reduceDepend s (OneOfDepend (d:ds)) = if isJust d' then d' else reduceDepend s (OneOfDepend ds) where
   d' = reduceDepend s d
 
 listAllBinaries :: Suite -> [BinaryRecord]
 listAllBinaries = concatMap (M.elems . outputs) . M.elems . suiteRecords
 
+-- | @priorities s@ list the tuple of priority group and its counts
+--
+-- >>> priorities s
+-- [(73,"required"),(82,"important"),(99,"standard"),(2568,""),(14265,"extra"),(40434,"optional")]
 priorities :: Suite -> [(Int, T.Text)]
 priorities s = sortOn fst $ fmap (length &&& head) $ (group . sort) $ map priority $ listAllBinaries s
 
@@ -210,7 +208,6 @@ stage2 = do
   s <- S.get
   return (r, length $ badSourceRecords s)
   where
-
     hardwork :: Suite' [Int]
     hardwork = do
       x <- calc
@@ -220,9 +217,6 @@ stage2 = do
         do
           xs <- hardwork
           return (x:xs)
-
-loadSuite :: FilePath -> IO Suite
-loadSuite = loadObject
 
 findSourceByBinName :: Suite -> BinName -> Maybe SourceRecord
 findSourceByBinName s n = bin2srcName s n >>= findSourceBySrcName s
@@ -292,11 +286,7 @@ tryCalc sr = do
 
 
 binHashS :: Suite -> BinName -> Maybe HashString
-binHashS s n = bin2srcName s n >>= findSourceBySrcName s >>= binHash n where
-  binHash :: BinName -> SourceRecord -> Maybe HashString
-  binHash n' sr = ensure >> shash sr >>= \h1 -> Just $ T.pack (hashArray [h1, n']) where
-    ensure = M.lookup n' (outputs sr)
-
+binHashS s n = findSourceByBinName s n >>= (`binaryHash` n)
 
 associatePrebuild :: SuitePrebuild -> Suite -> Suite
 associatePrebuild c s = s { suitePrebuild = associatePrebuild' c s }
