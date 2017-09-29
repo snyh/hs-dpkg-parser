@@ -2,6 +2,8 @@
 {-# LANGUAGE OverloadedStrings  #-}
 
 import           Data.Maybe
+import           Fetcher                         (SuiteConfig (SuiteConfig),
+                                                  downloadSuite)
 import           Suite
 import           System.Console.CmdArgs.Implicit
 import           System.IO.Unsafe
@@ -20,6 +22,8 @@ data DRepo = DRepo {
   ,outFile :: String
   } deriving (Show, Data, Typeable)
 
+
+download' = downloadSuite $ SuiteConfig "http://pools.corp.deepin.com/deepin" "panda" "amd64"
 
 defaultOutput = "./ok.dat"
 
