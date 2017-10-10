@@ -13,7 +13,7 @@ import           Data.Ord
 import           Data.Store
 import qualified Data.Text    as T
 import           GHC.Generics
-import           Utils        (hashArray)
+import           Utils        (hashArray, toInt)
 
 type OutputHash = T.Text
 
@@ -33,7 +33,8 @@ data Version = Version {
 
 instance Ord Version where
   --TODO: To implement and verify logicals in https://www.debian.org/doc/debian-policy/ch-controlfields.html#s-f-Version
-  compare = comparing verEpoch <> comparing verUpstream <> comparing verRevision
+  compare = comparing verEpoch <> comparing (toIntArray . verUpstream) <> comparing (toIntArray . verRevision) where
+    toIntArray = map toInt . T.split (`elem` ['.', '~', '+'])
 
 data LimitVer =
   VerAny

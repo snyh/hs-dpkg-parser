@@ -9,6 +9,7 @@ module Utils (
   ,fallback
   ,jq
   ,jq'
+  ,toInt
   ,readDefault
   ,loadObject
   ,storeObject
@@ -38,6 +39,8 @@ import           Text.Read
 hashArray :: (ToString a, Monoid a, Ord a) => [a] -> String
 hashArray xs = hashIt $ foldr1 mappend $ nub $ sort xs
 
+toInt :: ToString a => a -> Int
+toInt is = fromMaybe 0 $ readMaybe (toString is)
 
 hashIt :: (ToString a) => a -> String
 hashIt s = show (hash $ B.fromString $ toString s :: Digest SHA256)

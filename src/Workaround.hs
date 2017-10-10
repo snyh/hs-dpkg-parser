@@ -1,9 +1,11 @@
 {-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Workaround(
   buildCache
+  ,bootstrapByDSC
   ) where
 
 
@@ -53,18 +55,19 @@ binKeys = [
 type BinRecord = R.Record
 type SrcRecord = R.Record
 
-type RawVersion = T.Text
 type DependLine = T.Text
 type ProvideLine = T.Text
 
-matchTheSrc :: SrcName -> RawVersion -> BinRecord -> Bool
-matchTheSrc srcName srcVersion pkg = pkgSrcName == srcName && pkgSrcVersion == srcVersion where
-  pkgName = R.get "Package" pkg
-  defaultVersion = R.get "Version" pkg
-  rawSrcStr = R.get "Source" pkg
-  (pkgSrcName, pkgSrcVersion) = case R.parseBinSrc rawSrcStr defaultVersion of
-    Left _  -> (pkgName, defaultVersion)
-    Right t -> t
+matchTheSrc :: SrcRecord -> BinRecord -> Bool
+matchTheSrc theSrc thePkg = matchVersionAndName && matchBinaryField where
+  matchVersionAndName = srcName == pkgSrcName && pkgSrcVersion == srcVersion
+  matchBinaryField = fst defaultValue `elem` R.getArray "Binary" "," theSrc
+
+  srcVersion = R.get "Version" theSrc
+  srcName = R.get "Package" theSrc
+  defaultValue = (R.get "Package" thePkg, R.get "Version" thePkg)
+  rawSource = R.get "Source" thePkg
+  (pkgSrcName, pkgSrcVersion) = either (const defaultValue) id (R.parseBinSrc rawSource $ snd defaultValue)
 
 merge :: [SrcRecord] -> [BinRecord] -> [R.Record]
 merge [] _ = []
@@ -72,14 +75,10 @@ merge x [] = x
 merge (theSrc:otherSrcs) allPkgs = buildOne : merge otherSrcs otherPkgs where
   !buildOne = merge' theSrc thesePkgs
 
-  srcVersion = R.get "Version" theSrc
-  srcName = R.get "Package" theSrc
-
   bins = R.get "Binary" theSrc
   numOfThesePkg = 1 + T.count "," bins
 
-  (!thesePkgs, !otherPkgs) = partitionN numOfThesePkg pFn allPkgs where
-    pFn = matchTheSrc srcName srcVersion
+  (!thesePkgs, !otherPkgs) = partitionN numOfThesePkg (matchTheSrc theSrc) allPkgs
 
 
 merge' :: SrcRecord -> [BinRecord] -> R.Record
@@ -117,7 +116,10 @@ parseRawPackages fsrc fbin = let
 
 
 bootstrapByDSC :: BootstrapFunc
-bootstrapByDSC sr = if isEssential sr then Just $ dscHash $ dsc sr else Nothing
+bootstrapByDSC sr = if
+  | isEssential sr -> Just $ dscHash $ dsc sr
+  | sname sr `elem` ["po4a"] -> Just $ dscHash $ dsc sr
+  | otherwise -> Nothing
 
 buildCache :: FilePath -> FilePath -> FilePath -> Architecture -> IO Suite
 buildCache fsrc fbin fout arch = do

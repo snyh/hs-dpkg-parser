@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings  #-}
 
 import           Data.Maybe
+import           Data.Monoid
 import           Fetcher                         (SuiteConfig (SuiteConfig),
                                                   downloadSuite)
 import           Suite
@@ -11,7 +12,27 @@ import           Types
 import           Utils                           (jq, loadObject)
 import           Workaround                      (buildCache)
 
-main = do
+
+_prefix = "debian"
+defaultOutput = "./ok.dat"
+
+main = let
+  myArgs :: DRepo
+  myArgs = DRepo {
+    srcFile = _prefix <> "_Sources"
+      &= help "raw Sources control file"
+      &= typFile
+
+    ,binFile = _prefix <> "_Packages"
+      &= help "raw Packages control file"
+      &= typFile
+
+    ,outFile = defaultOutput
+      &= help "the output files"
+      &= typFile
+    }
+    &= summary "DRepo v1"
+  in do
   c <- cmdArgs myArgs
   putStrLn "Start parsing...."
   buildCache (srcFile c) (binFile c) (outFile c) (ArchName "amd64")
@@ -22,26 +43,8 @@ data DRepo = DRepo {
   ,outFile :: String
   } deriving (Show, Data, Typeable)
 
-
-download' = downloadSuite $ SuiteConfig "http://pools.corp.deepin.com/deepin" "panda" "amd64"
-
-defaultOutput = "./ok.dat"
-
-myArgs :: DRepo
-myArgs = DRepo {
-  srcFile = "./Sources"
-    &= help "raw Sources control file"
-    &= typFile
-
-  ,binFile = "./Packages"
-    &= help "raw Packages control file"
-    &= typFile
-
-  ,outFile = defaultOutput
-    &= help "the output files"
-    &= typFile
-  }
-  &= summary "DRepo v1"
+download' = downloadSuite _prefix $ SuiteConfig "http://pools.corp.deepin.com/mips64el" "unstable" "mips64el"
+downloadP = downloadSuite _prefix $ SuiteConfig "http://pools.corp.deepin.com/debian" "unstable" "amd64"
 
 ----------------------------------------------------
 gg :: SrcName -> SourceRecord

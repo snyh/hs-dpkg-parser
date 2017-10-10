@@ -42,29 +42,29 @@ fetchDFile (fp, Just h) = do
     return bs
 
 checkDFile :: DFile -> IO ()
-checkDFile (f, Nothing) = return ()
+checkDFile (_, Nothing) = return ()
 checkDFile (f, Just h)  = void $ fetchDFile (f, Just h)
 
 fetchAndMerge :: [DFile] -> DFile -> IO ()
-fetchAndMerge ins out@(f, h) = checkDFile out >> doIt where
+fetchAndMerge ins out@(f, _) = checkDFile out >> doIt where
   doIt = withFile f WriteMode $ \h -> mapM_ (fetchDFile >=> BL.hPutStrLn h) ins
 
-downloadSuite :: SuiteConfig -> IO (FilePath, FilePath)
-downloadSuite cfg = let
+downloadSuite :: String -> SuiteConfig -> IO (FilePath, FilePath)
+downloadSuite prefix cfg = let
   distFile :: String -> String -> String
   distFile a b = host cfg <> "/dists/" <> codeName cfg <> "/" <> a <> "/" <> b
 
   components = [ "main", "contrib", "non-free" ]
 
   srcList = distFile <$> components <*> ["source/Sources.gz"]
-  binList = distFile <$> components <*> ["binary-amd64/Packages.gz"]
+  binList = distFile <$> components <*> ["binary-"<> arch cfg <>"/Packages.gz"]
 
   release = host cfg <> "/dists/" <> codeName cfg <> "/Release"
 
   handle :: Record -> Int
   handle r = length r
 
-  (f1, f2) = (simpleDFile "ttt_Sources", simpleDFile "ttt_Packages")
+  (f1, f2) = (simpleDFile (prefix <> "_Sources"), simpleDFile (prefix <> "_Packages"))
   in do
     print srcList
     fetchAndMerge (map simpleDFile srcList) f1
