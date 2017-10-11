@@ -184,12 +184,12 @@ findDepends s sr = if null badDeps then nub <$> goodSrcs else Left (T.unwords $ 
 --      - 若@dArchLimit@与@s@不匹配则直接忽略返回@Just IgnoreDepend@
 --      - 否则返回@Nothing@
 reduceDepend :: Suite -> Depend -> Either T.Text Depend
-reduceDepend s d@SimpleDepend{ dName=n, dArchLimit=aLimit } =
+reduceDepend s d@SimpleDepend{ dName=n } =
   if | canIgnore -> Right IgnoreDepend
      | hasTheSource -> Right d
      | otherwise -> Left n where
   hasTheSource = isJust $ bin2srcName s n
-  canIgnore = not (null aLimit) && (suiteArch s `notElem` aLimit)
+  canIgnore = canSafeIgnoreDepend (suiteArch s) d
 reduceDepend _ IgnoreDepend = Right IgnoreDepend
 reduceDepend _ (OneOfDepend []) = Left "shouldn't go here"
 reduceDepend s (OneOfDepend (d:ds)) = either (const tryNext) return (reduceDepend s d) where

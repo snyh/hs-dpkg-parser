@@ -88,6 +88,24 @@ data Depend =
       }
   deriving (Show, Eq, Generic, FromJSON, ToJSON, Store)
 
+canSafeIgnoreDepend :: Architecture -> Depend -> Bool
+canSafeIgnoreDepend arch SimpleDepend{dArchLimit=limits} = notEmpty && (inNotList || not inList) where
+  notEmpty = not (null limits)
+  inNotList = arch `elem` notList
+  inList = arch `elem` list
+
+  isNot :: Architecture -> Bool
+  isNot (ArchIsNot _) = True
+  isNot _             = False
+  fromNot :: Architecture -> Architecture
+  fromNot (ArchIsNot x) = x
+  fromNot x             = x
+
+  notList = map fromNot $ filter isNot limits
+  list = filter (not . isNot) limits
+
+
+canSafeIgnoreDepend _ _ = error "it can only used with SimpleDepend"
 
 data BinaryRecord = BinaryRecord {
   bname         :: BinName

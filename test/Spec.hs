@@ -84,6 +84,27 @@ specParser = do
       `shouldParse`
       [ArchName "i386", ArchAny]
 
+    it "i386 == !amd64" $
+     ArchName "i386" == ArchIsNot (ArchName "amd64")
+      `shouldBe`
+      True
+
+    let t = "binutils-x86-64-linux-gnu [!amd64 !i386 !x32] with amd64" :: T.Text
+        arch = ArchName "amd64"
+      in it ("should ignore " <> T.unpack t) $
+         canSafeIgnoreDepend arch <$> parseDepend t
+         `shouldBe`
+         Right True
+
+    it "shouldn't ignore [i386 amd64] with amd64" $
+      canSafeIgnoreDepend (ArchName "amd64") <$> parseDepend "nop [i386 amd64]"
+      `shouldBe`
+      Right False
+
+    it "should ignore [kfreebsd-any] with amd64" $
+      canSafeIgnoreDepend (ArchName "amd64") <$> parseDepend "nop [kfreebsd-any]"
+      `shouldBe`
+      Right True
 
   describe "R.parseXXX" $ do
     let str = "liba52-0.7.4 (= 0.7.4-18) [i386] <buildd>"
