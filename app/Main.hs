@@ -44,7 +44,7 @@ data DRepo = DRepo {
   } deriving (Show, Data, Typeable)
 
 download' = downloadSuite _prefix $ SuiteConfig "http://pools.corp.deepin.com/mips64el" "unstable" "mips64el"
-downloadP = downloadSuite _prefix $ SuiteConfig "http://pools.corp.deepin.com/debian" "unstable" "amd64"
+downloadP = downloadSuite _prefix $ SuiteConfig "http://mirrors.ustc.edu.cn/debian" "stable" "amd64"
 
 ----------------------------------------------------
 gg :: SrcName -> SourceRecord

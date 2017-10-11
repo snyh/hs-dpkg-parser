@@ -103,17 +103,17 @@ specParser = do
 specSuite :: Spec
 specSuite =
   describe "Parse suite:" $ do
-    xit "parsing lx_test_data" $
+    it "parsing lx_test_data" $
       length testRecords
       `shouldSatisfy`
       (> 4000)
 
-    xit "There should have some virtual packages." $
+    it "There should have some virtual packages." $
       listAllVirtuals testSuite
       `shouldNotBe`
       empty
 
-    xit "The number of bad source records should be lower than 777." $
+    it "The number of bad source records should be lower than 777." $
       length (badSourceRecords testSuite)
       `shouldSatisfy`
       (< 777)

@@ -199,10 +199,11 @@ pArchitecture = reduce <$> p where
   pp = do
     arch <- takeWhile1 (\c -> C.isAlphaNum c || c == '-' || c =='_')
     case arch of
-      "any"    -> return ArchAny
-      "native" -> return ArchNative
-      "all"    -> return ArchAll
-      _        -> return $ ArchName arch
+      "linux-any" -> return ArchAny
+      "any"       -> return ArchAny
+      "native"    -> return ArchNative
+      "all"       -> return ArchAll
+      _           -> return $ ArchName arch
 
 
 pLimitVersion :: Parser TP.LimitVer
