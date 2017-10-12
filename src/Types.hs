@@ -38,12 +38,12 @@ instance Ord Version where
 
 data LimitVer =
   VerAny
-  | VerGT Version
-  | VerGTE Version
   | VerLT Version
   | VerLTE Version
   | VerEQ Version
-  deriving (Eq, Show, Generic, FromJSON, ToJSON, Store)
+  | VerGTE Version
+  | VerGT Version
+  deriving (Eq, Ord, Show, Generic, FromJSON, ToJSON, Store)
 
 type LimitArch = [Architecture]
 
@@ -54,7 +54,7 @@ data Architecture =
   -- | @ArchName "amd64"@
   | ArchName T.Text
   | ArchIsNot Architecture
-  deriving (Show, Generic, FromJSON, ToJSON, Store)
+  deriving (Show, Ord, Generic, FromJSON, ToJSON, Store)
 
 instance Eq Architecture where
   (==) (ArchIsNot a) b           = a /= b
@@ -79,14 +79,14 @@ data Depend =
   IgnoreDepend
 
   -- | 满足任意一个Depend即可
-    | OneOfDepend [Depend]
+  | OneOfDepend [Depend]
 
   | SimpleDepend {
       dName          :: BinName
       ,dVersionLimit :: LimitVer
       ,dArchLimit    :: LimitArch
       }
-  deriving (Show, Eq, Generic, FromJSON, ToJSON, Store)
+  deriving (Show, Eq, Ord, Generic, FromJSON, ToJSON, Store)
 
 canSafeIgnoreDepend :: Architecture -> Depend -> Bool
 canSafeIgnoreDepend arch SimpleDepend{dArchLimit=limits} = notEmpty && (inNotList || not inList) where
@@ -103,8 +103,6 @@ canSafeIgnoreDepend arch SimpleDepend{dArchLimit=limits} = notEmpty && (inNotLis
 
   notList = map fromNot $ filter isNot limits
   list = filter (not . isNot) limits
-
-
 canSafeIgnoreDepend _ _ = error "it can only used with SimpleDepend"
 
 data BinaryRecord = BinaryRecord {

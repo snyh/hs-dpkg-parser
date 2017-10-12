@@ -6,9 +6,9 @@ import           Data.Monoid
 import qualified Data.Text             as T
 import           Record                as R
 import           Suite                 (badSourceRecords, bin2srcName,
-                                        buildSuite, canBeBuild, empty,
+                                        buildSuite, deadPackages, empty,
                                         findSourceBySrcName, listAllBinaries,
-                                        listAllVirtuals)
+                                        listAllVirtuals, shouldBuild)
 import           System.IO.Unsafe
 import           Test.Hspec
 import           Test.Hspec.Attoparsec
@@ -146,10 +146,14 @@ specSuite =
 
     let pkg = "file" :: T.Text
       in it ("We should be able to build " ++ T.unpack pkg ++ ".") $
-         canBeBuild testSuite <$> findSourceBySrcName testSuite pkg
+         shouldBuild testSuite <$> findSourceBySrcName testSuite pkg
          `shouldSatisfy`
          isRight . fromJust
 
+    it "There shouldn't has any dead packages" $
+      deadPackages testSuite
+      `shouldBe`
+      []
 
 testRecords :: [R.Record]
 --testRecords = head $ rights [unsafePerformIO $ parseRecords [] "./test/lx_test_data"]

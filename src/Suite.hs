@@ -6,8 +6,9 @@
 
 
 module Suite (
-  canBeBuild,
+  shouldBuild,
   canBeBuild',
+  deadPackages,
 
   dscHash,
   badSourceRecords,
@@ -38,6 +39,7 @@ import           Data.Either
 import           Data.Foldable
 import qualified Data.Map            as M
 import           Data.Maybe
+import qualified Data.Set            as SET
 import           Debug.Trace
 import qualified Record              as R
 import           System.FilePath     (takeExtension)
@@ -188,8 +190,8 @@ reduceDepend s d@SimpleDepend{ dName=n } =
   if | canIgnore -> Right IgnoreDepend
      | hasTheSource -> Right d
      | otherwise -> Left n where
-  hasTheSource = isJust $ bin2srcName s n
   canIgnore = canSafeIgnoreDepend (suiteArch s) d
+  hasTheSource = isJust $ bin2srcName s n
 reduceDepend _ IgnoreDepend = Right IgnoreDepend
 reduceDepend _ (OneOfDepend []) = Left "shouldn't go here"
 reduceDepend s (OneOfDepend (d:ds)) = either (const tryNext) return (reduceDepend s d) where
@@ -212,9 +214,16 @@ stage1 fn = do
       ss' = M.map trySetSHash (suiteRecords s)
   S.put s { suiteRecords = ss' }
 
--- | badSourceRecords __/s/__ 返回仓库__/s/__中无法编译的源码包名列表
+-- | badSourceRecords @s@ 返回仓库@s@中无法编译的源码包名列表
 badSourceRecords :: Suite -> [SrcName]
 badSourceRecords = map sname . filter (isNothing . shash) . M.elems . suiteRecords
+
+-- | deadPackages @s@ 返回仓库@s@源码中有依赖但无法从@s@中构建出来的二进制包名。
+deadPackages :: Suite -> [T.Text]
+deadPackages s = allBads where
+  allDepends :: [Depend]
+  allDepends = SET.toList $ foldr (\x acc -> SET.union acc $ SET.fromList (buildDepends x)) SET.empty (listAllSources s)
+  allBads = lefts $ map (reduceDepend s) allDepends
 
 -- | tryCalcSHash @sr@ 尝试计算@sr@的shash, 若成功则更新状态到@Suite'@中。返回成功与否。
 tryCalcSHash :: SourceRecord -> Suite' Bool
@@ -245,7 +254,7 @@ stage2 = let
 
   shouldBeBuild :: Suite -> [SourceRecord]
   shouldBeBuild s = filter v (listAllSources s) where
-    v = either (const False) id . canBeBuild s
+    v = either (const False) id . shouldBuild s
 
   loop' :: Suite' [Int]
   loop' = do
@@ -265,30 +274,29 @@ findSourceBySrcName :: Suite -> SrcName -> Maybe SourceRecord
 findSourceBySrcName s n = M.lookup n $ suiteRecords s
 
 bin2srcName :: Suite -> BinName -> Maybe SrcName
-bin2srcName s bn = debugR where
-  (xx, vs) = suiteCache s
+bin2srcName s bn = result where
+  (ss, vs) = suiteCache s
   debugR = if isNothing result then trace ("Can't find binary package " <> T.unpack bn) result else result
 
   result = if isJust d then d else v
 
   d :: Maybe SrcName
-  d = M.lookup bn xx
+  d = M.lookup bn ss
 
   v :: Maybe SrcName
-  v =  join (listToMaybe . mapMaybe (`M.lookup` xx) <$> M.lookup bn vs)
-
+  v =  join (listToMaybe . mapMaybe (`M.lookup` ss) <$> M.lookup bn vs)
 
 
 --canBeBuild' :: Suite -> SrcName -> Maybe Bool
-canBeBuild' s sn = canBeBuild s $ fromJust $ findSourceBySrcName s sn
+canBeBuild' s sn = shouldBuild s $ fromJust $ findSourceBySrcName s sn
 
--- | @canBeBuild s sr@ 判断此'Types.SourceRecord'是否可以被直接计算出shash
+-- | @shouldBuild s sr@ 判断此'Types.SourceRecord'是否需要且可以直接计算shash
 --
 -- 1. @buildDepends sr@ 为空 && @shash sr == Nothing@  --> True
 -- 2. forall e in BuildDepends of sr, the shash of e isn't Nothing -> True
 -- 3. Otherwie -> False
-canBeBuild :: Suite -> SourceRecord -> Either T.Text Bool
-canBeBuild s sr = if
+shouldBuild :: Suite -> SourceRecord -> Either T.Text Bool
+shouldBuild s sr = if
   | isJust $ shash sr -> Right False
   | null . buildDepends $ sr -> Right True
   | otherwise -> v
