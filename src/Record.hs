@@ -175,9 +175,11 @@ parsePkgList = parseOnly (trim p) where
        | len < 4 -> fail "Invalid package list format"
 
 
-pkgNameRange = S.fromList (['a'..'z'] ++ ['0'..'9'] ++ "+-.")
+
 pkgName :: Parser BinName
-pkgName = do
+pkgName = let
+  pkgNameRange = S.fromList (['a'..'z'] ++ ['0'..'9'] ++ "+-.")
+  in do
   firstC <- peekChar
   if (C.isAlpha <$> firstC) == Just False then
     fail "package name must start with an alphanumeric character"
@@ -189,6 +191,16 @@ pkgName = do
 -- prepended to each of the names, meaning “NOT”.
 pLimitArch :: Parser TP.LimitArch
 pLimitArch = between (char '[') (char ']') (many1' (trim pArchitecture))
+
+pLimitProfile :: Parser TP.LimitProfile
+pLimitProfile = between (char '<') (char '>') (many1' (trim pProfile))
+
+pProfile :: Parser TP.Profile
+pProfile = reduce <$> p where
+  reduce (ProfileIsNot (ProfileIsNot x)) = reduce x
+  reduce x                               = x
+  p = (ProfileIsNot <$> (char '!' *> p)) <|> pp
+  pp = ProfileName <$> takeWhile1 (\c -> C.isAlphaNum c || c == '-' || c =='_')
 
 pArchitecture :: Parser Architecture
 pArchitecture = reduce <$> p where
@@ -221,9 +233,10 @@ parseDepend = parseOnly p2 where
   pArch = option [] pLimitArch
   p1 = do
     n <- trim pkgName
-    dVer <- trim pVer
-    dArch <- trim pArch
-    return $ SimpleDepend n dVer dArch
+    ver <- trim pVer
+    as <- trim pArch
+    ps <- option [] pLimitProfile
+    return $ SimpleDepend n ver as ps
 
   p2 :: Parser Depend
   p2 = do

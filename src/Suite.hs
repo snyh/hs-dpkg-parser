@@ -190,7 +190,7 @@ reduceDepend s d@SimpleDepend{ dName=n } =
   if | canIgnore -> Right IgnoreDepend
      | hasTheSource -> Right d
      | otherwise -> Left n where
-  canIgnore = canSafeIgnoreDepend (suiteArch s) d
+  canIgnore = canSafeIgnoreDepend (suiteArch s) ProfileNone d
   hasTheSource = isJust $ bin2srcName s n
 reduceDepend _ IgnoreDepend = Right IgnoreDepend
 reduceDepend _ (OneOfDepend []) = Left "shouldn't go here"

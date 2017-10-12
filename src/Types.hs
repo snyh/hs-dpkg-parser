@@ -46,6 +46,13 @@ data LimitVer =
   deriving (Eq, Ord, Show, Generic, FromJSON, ToJSON, Store)
 
 type LimitArch = [Architecture]
+type LimitProfile = [Profile]
+
+data Profile =
+  ProfileNone
+  | ProfileName T.Text
+  | ProfileIsNot Profile
+  deriving (Show, Eq, Ord, Generic, FromJSON, ToJSON, Store)
 
 data Architecture =
   ArchAny
@@ -85,11 +92,12 @@ data Depend =
       dName          :: BinName
       ,dVersionLimit :: LimitVer
       ,dArchLimit    :: LimitArch
+      ,dProfile      :: LimitProfile
       }
   deriving (Show, Eq, Ord, Generic, FromJSON, ToJSON, Store)
 
-canSafeIgnoreDepend :: Architecture -> Depend -> Bool
-canSafeIgnoreDepend arch SimpleDepend{dArchLimit=limits} = notEmpty && (inNotList || not inList) where
+canSafeIgnoreDependByArch :: Architecture -> Depend -> Bool
+canSafeIgnoreDependByArch arch SimpleDepend{dArchLimit=limits} = notEmpty && (inNotList || not inList) where
   notEmpty = not (null limits)
   inNotList = arch `elem` notList
   inList = arch `elem` list
@@ -103,7 +111,33 @@ canSafeIgnoreDepend arch SimpleDepend{dArchLimit=limits} = notEmpty && (inNotLis
 
   notList = map fromNot $ filter isNot limits
   list = filter (not . isNot) limits
-canSafeIgnoreDepend _ _ = error "it can only used with SimpleDepend"
+canSafeIgnoreDependByArch _ _ = error "it can only used with SimpleDepend"
+
+canSafeIgnoreDependByProfile :: Profile -> Depend -> Bool
+canSafeIgnoreDependByProfile p SimpleDepend{dProfile=limits} = notEmpty && canIgnore where
+  notEmpty = not (null limits)
+  canIgnore
+    | p == ProfileNone = null notList
+    | otherwise = inNotList || not inList
+
+  inNotList = p `elem` notList
+
+  inList = p `elem` list
+
+  isNot :: Profile -> Bool
+  isNot (ProfileIsNot (ProfileName _)) = True
+  isNot _                              = False
+  fromNot :: Profile -> Profile
+  fromNot (ProfileIsNot x) = x
+  fromNot x                = x
+
+  notList = map fromNot $ filter isNot limits
+  list = filter (not . isNot) limits
+canSafeIgnoreDependByProfile _ _ = error "it can only used with SimpleDepend"
+
+canSafeIgnoreDepend :: Architecture -> Profile -> Depend -> Bool
+canSafeIgnoreDepend a p d = canSafeIgnoreDependByProfile p d || canSafeIgnoreDependByArch a d
+
 
 data BinaryRecord = BinaryRecord {
   bname         :: BinName
