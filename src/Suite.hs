@@ -2,6 +2,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE MultiWayIf            #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
 
 
@@ -9,6 +10,8 @@ module Suite (
   shouldBuild,
   canBeBuild',
   deadPackages,
+
+  whyCantBuildIt,
 
   dscHash,
   badSourceRecords,
@@ -26,8 +29,6 @@ module Suite (
   listAllBinaries,
 
   inspect,
-
-  findDepends,
 
   buildSuite,
   bin2srcName,
@@ -165,16 +166,30 @@ putRecord sr = do
   S.put $ s { suiteRecords = M.insert (sname sr) sr rs }
   return ()
 
-findDepends :: Suite -> SourceRecord -> Either T.Text [SourceRecord]
-findDepends s sr = if null badDeps then nub <$> goodSrcs else Left (T.unwords $ nub badDeps) where
-    (badDeps, goodDeps) = partitionEithers $ map (reduceDepend s) (buildDepends sr)
+-- | findGoodDepends @s@ @sr@ 查找 @buildDepends sr@ 的@shash@必须不为@Nothing@
+findGoodDepends :: Suite -> SourceRecord -> Either BinName [SourceRecord]
+findGoodDepends s sr = ret where
+  (badDeps :: [BinName], goodDeps) = partitionEithers $ map (reduceDepend s) (buildDepends sr)
+  goodDeps' :: [Depend]
+  goodDeps' = filter (/= IgnoreDepend) goodDeps
 
-    goodSrcs :: Either T.Text [SourceRecord]
-    goodSrcs = mapM depSrc $ filter (/= IgnoreDepend) goodDeps
+  badOne = find checker goodDeps'
 
-    depSrc :: Depend -> Either T.Text SourceRecord
-    depSrc d = maybe (Left n) Right (findSourceByBinName s n) where
-      n = dName d
+  checker :: Depend -> Bool
+  checker d = either (const True) (isNothing . shash) (dep2src d)
+
+  ret
+    | null badDeps = case badOne of
+                       Nothing -> goodSrcs
+                       Just d  -> Left $ dName d
+    | otherwise = Left $ head badDeps
+
+  goodSrcs :: Either T.Text [SourceRecord]
+  goodSrcs = mapM dep2src goodDeps'
+
+  dep2src :: Depend -> Either T.Text SourceRecord
+  dep2src d = maybe (Left n) Right (findSourceByBinName s n) where
+    n = dName d
 
 
 -- | @reduceDepend s d@ 根据仓库@s@的状态，
@@ -190,7 +205,7 @@ reduceDepend s d@SimpleDepend{ dName=n } =
   if | canIgnore -> Right IgnoreDepend
      | hasTheSource -> Right d
      | otherwise -> Left n where
-  canIgnore = canSafeIgnoreDepend (suiteArch s) ProfileNone d
+  canIgnore = canSafeIgnoreDepend (suiteArch s) (ProfileName "nocheck") d
   hasTheSource = isJust $ bin2srcName s n
 reduceDepend _ IgnoreDepend = Right IgnoreDepend
 reduceDepend _ (OneOfDepend []) = Left "shouldn't go here"
@@ -236,10 +251,10 @@ tryCalcSHash sr = do
 
   let myhash = dscHash $ dsc sr :: OutputHash
 
-  let depHashs = case findDepends s sr of
+  let depHashs = case findGoodDepends s sr of
         Left err -> trace (show err) $ Left err
         Right deps -> case mapM shash deps of
-            Nothing -> Left "HH"
+            Nothing -> error "HH"
             Just x  -> Right x
 
   let jh = T.pack . hashArray . (myhash:) <$> depHashs :: Either T.Text OutputHash
@@ -299,19 +314,7 @@ shouldBuild :: Suite -> SourceRecord -> Either T.Text Bool
 shouldBuild s sr = if
   | isJust $ shash sr -> Right False
   | null . buildDepends $ sr -> Right True
-  | otherwise -> v
-  where
-    myname = sname sr
-    v = p2 sr
-
-    p2 :: SourceRecord -> Either T.Text Bool
-    p2 sr' = do
-      deps <- findDepends s sr'
-      let fails = map sname $ filter (isNothing . shash) deps
-      if null fails then
-        Right True
-        else
-        Left $ T.unwords fails
+  | otherwise -> findGoodDepends s sr >> return True
 
 binHashS :: Suite -> BinName -> Maybe OutputHash
 binHashS s n = findSourceByBinName s n >>= (`binaryHash` n)
@@ -348,3 +351,13 @@ buildPackage :: Suite -> BinName -> IO ()
 buildPackage s n = undefined where
   theSrc = findSourceByBinName s n
   depends = undefined
+
+
+whyCantBuildIt :: Suite -> BinName -> T.Text
+whyCantBuildIt s bn = why where
+  Just sn = bin2srcName s bn
+  Just sr = findSourceBySrcName s sn
+
+  why = case shouldBuild s sr of
+    Right _  -> "Success"
+    Left bad -> trace ("Bad " ++ T.unpack bad) $ whyCantBuildIt s bad

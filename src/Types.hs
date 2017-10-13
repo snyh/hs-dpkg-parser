@@ -182,7 +182,7 @@ instance Ord SourceRecord where
 -- 属于 __required__或者__important__则为essentailas
 isEssential :: SourceRecord -> Bool
 isEssential sr = any _fpriority (M.elems $ outputs sr) where
-    _fpriority = (`elem` ["required", "important"]) . priority
+    _fpriority = (`elem` ["required", "important", "standard"]) . priority
 
 -- | Suite封装了一个deb仓库
 data Suite = Suite {
