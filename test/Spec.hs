@@ -5,8 +5,8 @@ import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text             as T
 import           Record                as R
-import           Suite                 (badSourceRecords, bin2srcName,
-                                        buildSuite, deadPackages, empty,
+import           Suite                 (badBins, bin2srcName, buildSuite,
+                                        deadPackages, empty,
                                         findSourceBySrcName, listAllBinaries,
                                         listAllVirtuals, shouldBuild)
 import           System.IO.Unsafe
@@ -145,10 +145,10 @@ specSuite =
       `shouldNotBe`
       empty
 
-    it "The number of bad source records should be lower than 777." $
-      length (badSourceRecords testSuite)
-      `shouldSatisfy`
-      (< 777)
+    it "The number of bad bins should be zero." $
+      badBins testSuite
+      `shouldBe`
+      []
 
     it "All of binary packages should has a corresponding source package" $
       all (isJust . bin2srcName testSuite) (map bname $ listAllBinaries testSuite)

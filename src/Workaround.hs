@@ -114,11 +114,10 @@ parseRawPackages fsrc fbin = let
     printf "%s has been parsed to %d binary records\n" fbin (length bins)
     return (srcs, bins, merge srcs bins)
 
-
 bootstrapByDSC :: BootstrapFunc
 bootstrapByDSC sr = if
   | isEssential sr -> Just $ dscHash $ dsc sr
-  | sname sr `elem` ["po4a"] -> Just $ dscHash $ dsc sr
+  | sname sr `elem` [] -> Just $ dscHash $ dsc sr
   | otherwise -> Nothing
 
 buildCache :: FilePath -> FilePath -> FilePath -> Architecture -> IO Suite

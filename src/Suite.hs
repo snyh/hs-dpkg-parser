@@ -11,10 +11,10 @@ module Suite (
   canBeBuild',
   deadPackages,
 
-  whyCantBuildIt,
+  detectCycleDepend,
 
   dscHash,
-  badSourceRecords,
+  badBins,
 
   stage2,
   stage1,
@@ -38,6 +38,7 @@ module Suite (
 
 import           Data.Either
 import           Data.Foldable
+import           Data.Function
 import qualified Data.Map            as M
 import           Data.Maybe
 import qualified Data.Set            as SET
@@ -229,10 +230,6 @@ stage1 fn = do
       ss' = M.map trySetSHash (suiteRecords s)
   S.put s { suiteRecords = ss' }
 
--- | badSourceRecords @s@ 返回仓库@s@中无法编译的源码包名列表
-badSourceRecords :: Suite -> [SrcName]
-badSourceRecords = map sname . filter (isNothing . shash) . M.elems . suiteRecords
-
 -- | deadPackages @s@ 返回仓库@s@源码中有依赖但无法从@s@中构建出来的二进制包名。
 deadPackages :: Suite -> [T.Text]
 deadPackages s = allBads where
@@ -280,7 +277,7 @@ stage2 = let
   in do
   r <- loop'
   s <- S.get
-  return (r, length $ badSourceRecords s)
+  return (r, length $ badBins s)
 
 findSourceByBinName :: Suite -> BinName -> Maybe SourceRecord
 findSourceByBinName s n = bin2srcName s n >>= findSourceBySrcName s
@@ -352,12 +349,30 @@ buildPackage s n = undefined where
   theSrc = findSourceByBinName s n
   depends = undefined
 
+detectCycleDepend :: Suite -> BinName -> [BinName]
+detectCycleDepend s bn = why where
+  sr = bin2srcName s bn >>= findSourceBySrcName s
+  why = case shouldBuild s <$> sr of
+          Nothing -> [bn <> "?"]
+          Just test -> case test of
+                       Right _  -> []
+                       Left bad -> bad: takeWhile (/= bad) (detectCycleDepend s bad)
 
-whyCantBuildIt :: Suite -> BinName -> T.Text
-whyCantBuildIt s bn = why where
-  Just sn = bin2srcName s bn
-  Just sr = findSourceBySrcName s sn
+collectBadBins :: Suite -> [ ([BinName], [BinName]) ]
+collectBadBins s = rets where
+  bins = map bname $ listAllBinaries s
+  bads :: [ (BinName, [BinName]) ]
+  bads = filter (not . null . snd ) $ map (id &&& detectCycleDepend s) bins
+  sorted = sortOn snd bads
 
-  why = case shouldBuild s sr of
-    Right _  -> "Success"
-    Left bad -> trace ("Bad " ++ T.unpack bad) $ whyCantBuildIt s bad
+  groups :: [ [(BinName, [BinName])] ]
+  groups = groupBy ( (==) `on` snd ) sorted
+
+  rets :: [ ([BinName], [BinName]) ]
+  rets = foldr (\i acc -> c i : acc) [] groups where
+    c :: [(BinName, [BinName])] -> ([BinName], [BinName])
+    c item = (map fst item, snd $ head item)
+
+-- | badBins @s@ 返回仓库@s@中因为循环依赖无法编译的源码包名列表
+badBins :: Suite -> [BinName]
+badBins = (sort . nub) . concatMap snd . collectBadBins
